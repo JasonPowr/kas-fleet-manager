@@ -125,18 +125,24 @@ func (c *client) CreateCluster(cluster *clustersmgmtv1.Cluster) (*clustersmgmtv1
 }
 
 func (c *client) GetOrganisationIdFromExternalId(externalId string) (string, error) {
-	res, err := c.connection.AccountsMgmt().V1().Organizations().List().Search(fmt.Sprintf("external_id='%s'", externalId)).Send()
-	if err != nil {
-		return "", err
-	}
+	externalIdCache := map[string]bool{externalId: false}
+	externalIdToOrgCache := map[string]string{}
 
-	items := res.Items()
-	if items.Len() < 1 {
-		// should never happen...
-		return "", errors.New(errors.ErrorGeneral, "organisation with external_id '%s' can't be found", externalId)
+	if !externalIdCache[externalId] {
+		res, err := c.connection.AccountsMgmt().V1().Organizations().List().Search(fmt.Sprintf("external_id='%s'", externalId)).Send()
+		if err != nil {
+			return "", err
+		}
+		items := res.Items()
+		if items.Len() < 1 {
+			// should never happen...
+			return "", errors.New(errors.ErrorGeneral, "organisation with external_id '%s' can't be found", externalId)
+		}
+		externalIdCache[externalId] = true
+		externalIdToOrgCache[externalId] = items.Get(0).ID()
+		return items.Get(0).ID(), nil
 	}
-
-	return items.Get(0).ID(), nil
+	return externalIdToOrgCache[externalId], nil
 }
 
 func (c *client) GetRequiresTermsAcceptance(username string) (termsRequired bool, redirectUrl string, err error) {
